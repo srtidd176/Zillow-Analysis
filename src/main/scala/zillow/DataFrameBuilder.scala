@@ -25,4 +25,28 @@ object DataFrameBuilder {
   val homePrice3BedDF: DataFrame = spark.read.option("header", true).csv("data/City_Zhvi_3bedroom.csv").toDF()
   val homePrice4BedDF: DataFrame = spark.read.option("header", true).csv("data/City_Zhvi_4bedroom.csv").toDF()
   val homePrice5OrMoreBedDF: DataFrame = spark.read.option("header", true).csv("data/City_Zhvi_5BedroomOrMore.csv").toDF()
+
+  def getRent(roomType: Int): DataFrame={
+    roomType match{
+      case 0 => return rentPriceStudioDF
+      case 1 => return rentPrice1BedDF
+      case 2 => return rentPrice2BedDF
+      case 3 => return rentPrice3BedDF
+      case 4 => return rentPrice4BedDF
+      case 5 => return rentPrice5OrMoreBedDF
+      case _ => null
+    }
+  }
+
+  def getHome(roomType: Int): DataFrame={
+    roomType match{
+      case 1 => return homePrice1BedDF
+      case 2 => return homePrice2BedDF
+      case 3 => return homePrice3BedDF
+      case 4 => return homePrice4BedDF
+      case 5 => return homePrice5OrMoreBedDF
+      case _ => null
+    }
+  }
+
 }
