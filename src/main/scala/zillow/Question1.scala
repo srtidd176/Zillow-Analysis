@@ -1,12 +1,13 @@
 package zillow
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types.{ArrayType, DoubleType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession, functions}
 
 import scala.collection.mutable.ArrayBuffer
 
-object Question1 {
+object Question1 extends java.io.Serializable{
   val spark = SparkSession.builder()
     .appName("Q1")
     .master("local[4]")
@@ -51,7 +52,14 @@ object Question1 {
         .add(StructField("YearlyPrice", ArrayType(StringType, true), true))
 
       val df = spark.createDataFrame(newRDD, schema)
-      df.show()
+
+      //Register a user defined function to work on spark DF
+      val avgPercChangeUDF = udf((array: Seq[String]) => avgPercChange(array.toArray))
+      spark.udf.register("avgPercChangeUDF", avgPercChangeUDF)
+
+      df.withColumn("YearlyPrice", avgPercChangeUDF($"YearlyPrice"))
+        .withColumnRenamed("YearlyPrice","AvgYearlyPercentChange")
+        .orderBy(functions.asc("AvgYearlyPercentChange"))show()
     }
 
 
