@@ -2,6 +2,6 @@ package zillow
 
 
 object Runner extends App {
-Question1.Q1Rent()
-Question1.Q1Home()
+  //Question2.Q2Rent()
+  Question2.Q2Home()
 }

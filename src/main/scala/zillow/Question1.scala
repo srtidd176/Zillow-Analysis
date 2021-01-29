@@ -14,16 +14,18 @@ object Question1 extends java.io.Serializable{
     .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")
 
- import spark.implicits._
+
+  //Register a user defined function to work on spark DF
+  val avgPercChangeUDF = udf((array: Seq[String]) => avgPercChange(array.toArray))
+  spark.udf.register("avgPercChangeUDF", avgPercChangeUDF)
+
+
+  import spark.implicits._
 
   def Q1Rent(): Unit ={
     /*
     NYC, Los Angeles, Chicago, Houston, Pheonix, Philadelphia, San Antonio, San Diego, Dallas, San Jose
      */
-
-    //Register a user defined function to work on spark DF
-    val avgPercChangeUDF = udf((array: Seq[String]) => avgPercChange(array.toArray))
-    spark.udf.register("avgPercChangeUDF", avgPercChangeUDF)
 
     for(i <- 0 to 5) {
 
@@ -55,7 +57,6 @@ object Question1 extends java.io.Serializable{
         .orderBy(functions.asc("AvgYearlyPercentChange")).show()
     }
 
-
   }
 
   def Q1Home(): Unit ={
@@ -63,8 +64,6 @@ object Question1 extends java.io.Serializable{
     NYC, Los Angeles, Chicago, Houston, Pheonix, Philadelphia, San Antonio, San Diego, Dallas, San Jose
      */
 
-    val avgPercChangeUDF = udf((array: Seq[String]) => avgPercChange(array.toArray))
-    spark.udf.register("avgPercChangeUDF", avgPercChangeUDF)
 
     for(i <- 1 to 5) {
 
