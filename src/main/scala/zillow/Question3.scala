@@ -1,6 +1,6 @@
 package zillow
 
-import org.apache.spark.sql.functions.{avg, bround, col, collect_list, concat_ws, expr, monotonically_increasing_id, regexp_extract, regexp_replace}
+import org.apache.spark.sql.functions.{avg, bround, col, collect_list, concat, concat_ws, expr, lit, monotonically_increasing_id, regexp_extract, regexp_replace}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 import com.crealytics.spark.excel._
 
@@ -38,46 +38,54 @@ object Question3 extends java.io.Serializable {
     castedDF
   }
 
+  def current_df_columns (df:DataFrame): Array[String]={
+    val column_list = df.columns.slice(1,df.columns.size-1)
+    column_list
+  }
+
 
   def Q3Rent(i:Int): DataFrame = {
 
-      val df = DataFrameBuilder.getRent(i,"State")
+    val df = DataFrameBuilder.getRent(i, "State")
 
-      //List of columns working with to filter out columns not needed
-      //casting valid years values to double
-      val column_names: ArrayBuffer[String] = ArrayBuffer("RegionName")
-      val regex = "[0-9]*[4-9]-[0-9]*".r
-      val valid_timeline = df.columns
-          .filter(p => regex.findFirstIn(p).isDefined).toBuffer
+    //List of columns working with to filter out columns not needed
+    //casting valid years values to double
+    val column_names: ArrayBuffer[String] = ArrayBuffer("RegionName")
+    val regex = "[0-9]*[4-9]-[0-9]*".r
+    val valid_timeline = df.columns
+      .filter(p => regex.findFirstIn(p).isDefined).toBuffer
 
-      val valid_timeline_renamed = valid_timeline.map(c => c.replace('-', '_'))
-      valid_timeline.prepend("RegionName") // old column names
-      column_names ++= valid_timeline_renamed // new column names
+    val valid_timeline_renamed = valid_timeline.map(c => c.replace('-', '_'))
+    valid_timeline.prepend("RegionName") // old column names
+    column_names ++= valid_timeline_renamed // new column names
 
-      //Renaming columns
-      var df2 = df.select(valid_timeline.map(c => col(c)): _*).toDF(column_names: _*)
-      df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
+    //Renaming columns
+    var df2 = df.select(valid_timeline.map(c => col(c)): _*).toDF(column_names: _*)
+    df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
 
-      var df3 = TransposeDF(df2, column_names.tail, "RegionName") //calling transpose method
+    var df3 = TransposeDF(df2, column_names.tail, "RegionName") //calling transpose method
 
-      df3 = df3.select("*") // to get year so average can be taken easily by groupby
-        .withColumn("Year", regexp_extract(col("Year_Month"), "([0-9]*[0-9])(_)", 1))
+    df3 = df3.select("*") // to get year so average can be taken easily by groupby
+      .withColumn("Year", regexp_extract(col("col0"), "([0-9]*[0-9])(_)", 1))
 
-      val states_List = df3.columns.slice(1,df3.columns.size-1) //Get the current state names in the dataset
+    df3 = df3.withColumn("Year", concat(col("Year"), lit("_Rent")))
 
-      df3 = CastDF(states_List, df3, "Double") //calling cast datatype method
+    val states_List = current_df_columns(df3) //Get the current state names in the dataset
 
-      var df_final = df3.select("Year").distinct() //drop any duplicate years
+    df3 = CastDF(states_List, df3, "Double") //calling cast datatype method
 
-      for (state_name <- states_List) {
-        val df_temp = df3.na.fill(0.0)
-          .select("Year",state_name)
-          .groupBy("Year")
-          .agg(bround(avg(state_name),1).alias(state_name))
+    var df_final = df3.select("Year").distinct() //drop any duplicate years
 
-        df_final = df_final.join(df_temp,Seq("Year"),"inner")
-      }
-      df_final
+    for (state_name <- states_List) {
+      val df_temp = df3.na.fill(0.0)
+        .select("Year", state_name)
+        .groupBy("Year")
+        .agg(bround(avg(state_name), 1).alias(state_name))
+
+      df_final = df_final.join(df_temp, Seq("Year"), "inner")
+    }
+
+    df_final
   }
 
   def Q3Home(i: Int): DataFrame = {
@@ -104,7 +112,9 @@ object Question3 extends java.io.Serializable {
     df3 = df3.select("*") // to get year so average can be taken easily by groupby
       .withColumn("Year", regexp_extract(col("col0"), "[2-9][0][1][4-9]", 0))
 
-    val states_List = df3.columns.slice(1,df3.columns.size-1) //Get the current state names in the dataset
+    df3 = df3.withColumn("Year",concat(col("Year"),lit("_Rent")))
+
+    val states_List = current_df_columns(df3) //Get the current state names in the dataset
 
     df3 = CastDF(states_List,df3,"Double") //calling cast datatype method
 
@@ -176,6 +186,20 @@ object Question3 extends java.io.Serializable {
 
   def Q3_Analysis():Unit={
 
+    var RentPriceStudioDF = Q3Rent(0)
+    var RentPrice1BedDF  = Q3Rent(1)
+    var RentPrice2BedDF  = Q3Rent(2)
+    var RentPrice3BedDF  = Q3Rent(3)
+    var RentPrice4BedDF  = Q3Rent(4)
+    var RentPrice5OrMoreBedDF = Q3Rent(5)
+
+    var HomePrice1BedDF  = Q3Home(1)
+    var HomePrice2BedDF  = Q3Home(2)
+    var HomePrice3BedDF  = Q3Home(3)
+    var HomePrice4BedDF  = Q3Home(4)
+    var HomePrice5OrMoreBedDF  = Q3Home(5)
+
+    var IncomeDF = Q3Income()
 
   }
 
