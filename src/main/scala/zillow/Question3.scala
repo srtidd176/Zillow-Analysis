@@ -1,8 +1,8 @@
 package zillow
 
-import org.apache.spark.sql.functions.{avg, bround, col, collect_list, concat, concat_ws, expr, lit, monotonically_increasing_id, regexp_extract, regexp_replace}
+import org.apache.spark.sql.functions.{avg, bround, col, collect_list, concat, concat_ws, expr, length, lit, monotonically_increasing_id, regexp_extract, regexp_replace}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
-import com.crealytics.spark.excel._
+
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -20,7 +20,7 @@ object Question3 extends java.io.Serializable {
     "Illinois", "Florida", "Ohio",
     "Pennsylvania", "Georgia", "North Carolina", "Michigan")
 
-  def TransposeDF(df: DataFrame, Columns: ArrayBuffer[String], Pivot_Col: String): DataFrame = {
+  def TransposeDF(df: DataFrame, Columns: Array[String], Pivot_Col: String): DataFrame = {
     val columnsValue = Columns.map(x => "'" + x + "', " + x)
     val stackCols = columnsValue.mkString(",")
 
@@ -30,17 +30,23 @@ object Question3 extends java.io.Serializable {
     pivotDF
   }
 
-  def CastDF(state_list:Array[String], df: DataFrame,castedTo:String): DataFrame = {
+  // casting the columns to double for calculation
+  def CastDF(column_list:Array[String], df: DataFrame,castedTo:String): DataFrame = {
     var castedDF = df
-    for (state_name <- state_list) { // casting the columns to double for calculation
-      castedDF = df.withColumn(state_name, df(state_name).cast(castedTo))
+    for (col_name <- column_list) {
+      castedDF = castedDF.withColumn(col_name, df(col_name).cast(castedTo))
     }
     castedDF
   }
 
-  def current_df_columns (df:DataFrame): Array[String]={
-    val column_list = df.columns.slice(1,df.columns.size-1)
+  def current_df_columns (df:DataFrame,Not_equals_Column:String): Array[String]={
+    val column_list = df.columns.filterNot(_.equals(Not_equals_Column))
     column_list
+  }
+
+  def state_renamer (listed_states:Array[String]): Array[String]={
+    val states_renamed_list = listed_states.map(state_name => state_name.replace(' ','_'))
+    states_renamed_list
   }
 
 
@@ -63,14 +69,15 @@ object Question3 extends java.io.Serializable {
     var df2 = df.select(valid_timeline.map(c => col(c)): _*).toDF(column_names: _*)
     df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
 
-    var df3 = TransposeDF(df2, column_names.tail, "RegionName") //calling transpose method
+    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName") //calling transpose method
 
     df3 = df3.select("*") // to get year so average can be taken easily by groupby
       .withColumn("Year", regexp_extract(col("col0"), "([0-9]*[0-9])(_)", 1))
+      .drop("col0")
 
     df3 = df3.withColumn("Year", concat(col("Year"), lit("_Rent")))
 
-    val states_List = current_df_columns(df3) //Get the current state names in the dataset
+    val states_List = current_df_columns(df3,"Year") //Get the current state names in the dataset
 
     df3 = CastDF(states_List, df3, "Double") //calling cast datatype method
 
@@ -84,9 +91,23 @@ object Question3 extends java.io.Serializable {
 
       df_final = df_final.join(df_temp, Seq("Year"), "inner")
     }
+    // Renaming columns of State to put in underscore for gaps
+    val states_renamed = state_renamer(current_df_columns(df_final,"Year")).toBuffer
+    states_renamed.prepend("Year")
+    val updated_names = states_renamed.toArray
+
+    // transposing the dataframe
+    df_final = df_final.toDF(updated_names:_*)
+    df_final = TransposeDF(df_final,current_df_columns(df_final,"Year"),"Year")
+      .withColumnRenamed("col0","State")
+
+    //current_df_columns(df_final,"State").foreach(println)
+    df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Double")
 
     df_final
+
   }
+
 
   def Q3Home(i: Int): DataFrame = {
     val df = DataFrameBuilder.getHome(i, "State")
@@ -107,14 +128,15 @@ object Question3 extends java.io.Serializable {
     df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
 
     //Transpose
-    var df3 = TransposeDF(df2, column_names.tail, "RegionName") //calling transpose method
+    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName") //calling transpose method
 
     df3 = df3.select("*") // to get year so average can be taken easily by groupby
       .withColumn("Year", regexp_extract(col("col0"), "[2-9][0][1][4-9]", 0))
+      .drop("col0")
 
-    df3 = df3.withColumn("Year",concat(col("Year"),lit("_Rent")))
+    df3 = df3.withColumn("Year",concat(col("Year"),lit("_Home")))
 
-    val states_List = current_df_columns(df3) //Get the current state names in the dataset
+    val states_List = current_df_columns(df3,"Year") //Get the current state names in the dataset
 
     df3 = CastDF(states_List,df3,"Double") //calling cast datatype method
 
@@ -128,17 +150,29 @@ object Question3 extends java.io.Serializable {
 
       df_final = df_final.join(df_temp,Seq("Year"),"inner")
     }
+    // Renaming columns of State to put in underscore for gaps
+    val states_renamed = state_renamer(current_df_columns(df_final,"Year")).toBuffer
+    states_renamed.prepend("Year")
+    val updated_names = states_renamed.toArray
+
+    // transposing the dataframe
+    df_final = df_final.toDF(updated_names:_*)
+    df_final = TransposeDF(df_final,current_df_columns(df_final,"Year"),"Year")
+      .withColumnRenamed("col0","State")
+
+    //current_df_columns(df_final,"State").foreach(println)
+    df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Double")
+
     df_final
   }
 
+
+
   def Q3Income(): DataFrame = {
 
-    var df = spark.read.excel(header = false, // Required
-      treatEmptyValuesAsNulls = true, // Optional, default: true
-      inferSchema = true, // Optional, default: false
-      addColorColumns = false, // Optional, default: false
-    ).load("/home/sriza/Downloads/h08.xlsx")
-      .withColumn("Index", monotonically_increasing_id) // created index col to remove unnecessary rows
+    var df = DataFrameBuilder.IncomeDF
+
+    df = df.withColumn("Index", monotonically_increasing_id) // created index col to remove unnecessary rows
       .filter(col("Index") > 3 and col("Index") =!= 5)
 
     //standard error column removal
@@ -176,18 +210,24 @@ object Question3 extends java.io.Serializable {
       .filter(df("State").isin(Populous_States_List: _*))
       .dropDuplicates("State")
 
+    //replacing year with year + income
     var df_final = df
     for (year <- valid_years) {
-      df_final = df.withColumn(year, regexp_replace(df(year), ",", ""))
+      df_final = df_final.withColumn(year, regexp_replace(df(year), ",", ""))
         .withColumnRenamed(year, s"${year}_Income")
     }
+    df_final = df_final.withColumn("State",regexp_replace(df_final("State")," ","_"))
+    df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Int")
+
     df_final
   }
 
-  def Q3_Analysis():Unit={
+  def Q3Analysis():Unit={
 
     var RentPriceStudioDF = Q3Rent(0)
     var RentPrice1BedDF  = Q3Rent(1)
+
+    /*
     var RentPrice2BedDF  = Q3Rent(2)
     var RentPrice3BedDF  = Q3Rent(3)
     var RentPrice4BedDF  = Q3Rent(4)
@@ -198,9 +238,28 @@ object Question3 extends java.io.Serializable {
     var HomePrice3BedDF  = Q3Home(3)
     var HomePrice4BedDF  = Q3Home(4)
     var HomePrice5OrMoreBedDF  = Q3Home(5)
+     */
 
     var IncomeDF = Q3Income()
 
+    RentPriceStudioDF = RentPriceStudioDF.join(IncomeDF,Seq("State"),"inner")
+    RentPrice1BedDF = RentPrice1BedDF.join(IncomeDF, Seq("State"), "inner")
+    val RentDFs = Seq(RentPriceStudioDF, RentPrice1BedDF)
+
+    for(df_name <- RentDFs){
+      val df = df_name
+        .withColumn("2019_PI_Ratio",bround((df_name("2019_Rent")/(df_name("2019_Income")/12))*100,0))
+        .withColumn("2018_PI_Ratio",bround((df_name("2018_Rent")/(df_name("2018_Income")/12))*100,0))
+        .withColumn("2017_PI_Ratio",bround((df_name("2017_Rent")/(df_name("2017_Income")/12))*100,0))
+        .withColumn("2016_PI_Ratio",bround((df_name("2016_Rent")/(df_name("2016_Income")/12))*100,0))
+        .withColumn("2015_PI_Ratio",bround((df_name("2015_Rent")/(df_name("2015_Income")/12))*100,0))
+        .withColumn("2014_PI_Ratio",bround((df_name("2014_Rent")/(df_name("2014_Income")/12))*100,0))
+
+      df.show()
+    }
+
   }
+
+
 
 }

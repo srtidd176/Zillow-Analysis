@@ -1,6 +1,7 @@
 package zillow
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import com.crealytics.spark.excel._
 
 object DataFrameBuilder {
 
@@ -40,6 +41,9 @@ object DataFrameBuilder {
   val stateHomePrice3BedDF: DataFrame = spark.read.option("header", true).csv("data/State_Zhvi_3bedroom.csv").toDF()
   val stateHomePrice4BedDF: DataFrame = spark.read.option("header", true).csv("data/State_Zhvi_4bedroom.csv").toDF()
   val stateHomePrice5OrMoreBedDF: DataFrame = spark.read.option("header", true).csv("data/State_Zhvi_5BedroomOrMore.csv").toDF()
+
+  //Income
+  val IncomeDF: DataFrame = spark.read.excel(header = false, treatEmptyValuesAsNulls = true, inferSchema = true).load("data/h08.xlsx")
 
 
   def getRent(roomType: Int, placeType:String): DataFrame={
@@ -89,5 +93,6 @@ object DataFrameBuilder {
       }
     }
   }
+
 
 }
