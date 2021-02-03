@@ -49,7 +49,6 @@ object Question3 extends java.io.Serializable {
     states_renamed_list
   }
 
-
   def Q3Rent(i:Int): DataFrame = {
 
     val df = DataFrameBuilder.getRent(i, "State")
@@ -69,20 +68,26 @@ object Question3 extends java.io.Serializable {
     var df2 = df.select(valid_timeline.map(c => col(c)): _*).toDF(column_names: _*)
     df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
 
-    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName") //calling transpose method
+    //calling transpose method
+    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName")
 
-    df3 = df3.select("*") // to get year so average can be taken easily by groupby
+    df3 = df3.select("*") // to get year so average can be taken easily with groupby
       .withColumn("Year", regexp_extract(col("col0"), "([0-9]*[0-9])(_)", 1))
       .drop("col0")
 
+    //renaming each year -> year_Rent
     df3 = df3.withColumn("Year", concat(col("Year"), lit("_Rent")))
 
-    val states_List = current_df_columns(df3,"Year") //Get the current state names in the dataset
+    //Get the current state names in the dataset
+    val states_List = current_df_columns(df3,"Year")
 
-    df3 = CastDF(states_List, df3, "Double") //calling cast datatype method
+    //calling cast datatype method
+    df3 = CastDF(states_List, df3, "Double")
 
-    var df_final = df3.select("Year").distinct() //drop any duplicate years
+    //drop any duplicate years
+    var df_final = df3.select("Year").distinct()
 
+    //Taking average each state at a time and then joined to new DF
     for (state_name <- states_List) {
       val df_temp = df3.na.fill(0.0)
         .select("Year", state_name)
@@ -105,9 +110,7 @@ object Question3 extends java.io.Serializable {
     df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Double")
 
     df_final
-
   }
-
 
   def Q3Home(i: Int): DataFrame = {
     val df = DataFrameBuilder.getHome(i, "State")
@@ -127,21 +130,27 @@ object Question3 extends java.io.Serializable {
     var df2 = df.select(valid_timeline.map(c => col(c)): _*).toDF(column_names: _*)
     df2 = df2.select("*").filter($"RegionName".isin(Populous_States_List: _*))
 
-    //Transpose
-    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName") //calling transpose method
+    //calling transpose method
+    var df3 = TransposeDF(df2, column_names.tail.toArray, "RegionName")
 
-    df3 = df3.select("*") // to get year so average can be taken easily by groupby
+    // to get year so average can be taken easily with groupby
+    df3 = df3.select("*")
       .withColumn("Year", regexp_extract(col("col0"), "[2-9][0][1][4-9]", 0))
       .drop("col0")
 
+    //renaming each year column -> year_Home
     df3 = df3.withColumn("Year",concat(col("Year"),lit("_Home")))
 
-    val states_List = current_df_columns(df3,"Year") //Get the current state names in the dataset
+    //Get the current state names in the dataset
+    val states_List = current_df_columns(df3,"Year")
 
-    df3 = CastDF(states_List,df3,"Double") //calling cast datatype method
+    //calling cast datatype method
+    df3 = CastDF(states_List,df3,"Double")
 
-    var df_final = df3.select("Year").distinct() //drop any duplicate years
+    //drop any duplicate years
+    var df_final = df3.select("Year").distinct()
 
+    //Taking average each state at a time and then joined to new DF
     for (state_name <- states_List) {
       val df_temp = df3.na.fill(0.0)
         .select("Year",state_name)
@@ -155,24 +164,23 @@ object Question3 extends java.io.Serializable {
     states_renamed.prepend("Year")
     val updated_names = states_renamed.toArray
 
-    // transposing the dataframe
+    // transposing the dataframe to appear smaller
     df_final = df_final.toDF(updated_names:_*)
     df_final = TransposeDF(df_final,current_df_columns(df_final,"Year"),"Year")
       .withColumnRenamed("col0","State")
 
-    //current_df_columns(df_final,"State").foreach(println)
+    //casting to double since transpose messes up dataypes
     df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Double")
 
     df_final
   }
 
-
-
   def Q3Income(): DataFrame = {
 
     var df = DataFrameBuilder.IncomeDF
 
-    df = df.withColumn("Index", monotonically_increasing_id) // created index col to remove unnecessary rows
+    // created index col to remove unnecessary rows
+    df = df.withColumn("Index", monotonically_increasing_id)
       .filter(col("Index") > 3 and col("Index") =!= 5)
 
     //standard error column removal
@@ -216,6 +224,7 @@ object Question3 extends java.io.Serializable {
       df_final = df_final.withColumn(year, regexp_replace(df(year), ",", ""))
         .withColumnRenamed(year, s"${year}_Income")
     }
+    //Renaming States then casting to Int for performing calculations
     df_final = df_final.withColumn("State",regexp_replace(df_final("State")," ","_"))
     df_final = CastDF(current_df_columns(df_final,"State"),df_final,"Int")
 
@@ -233,11 +242,13 @@ object Question3 extends java.io.Serializable {
     val HomeDF_names = Seq("1 bedroom","2 bedrooms",
       "3 bedrooms","4 bedrooms","5 or more bedrooms")
 
+    //Creating schema for empty DFs for Least/Most Affordable States
     val schema = new StructType()
-      .add("State",StringType)
       .add("Year",StringType)
+      .add("State",StringType)
       .add("PI_ratio",DoubleType)
-/*
+
+    //Rent Dataset
     var RentPriceStudioDF = Q3Rent(0)
     var RentPrice1BedDF  = Q3Rent(1)
     var RentPrice2BedDF  = Q3Rent(2)
@@ -245,19 +256,16 @@ object Question3 extends java.io.Serializable {
     var RentPrice4BedDF  = Q3Rent(4)
     var RentPrice5OrMoreBedDF = Q3Rent(5)
 
- */
-
+    //Home dataset
     var HomePrice1BedDF  = Q3Home(1)
-    /*
     var HomePrice2BedDF  = Q3Home(2)
     var HomePrice3BedDF  = Q3Home(3)
     var HomePrice4BedDF  = Q3Home(4)
     var HomePrice5OrMoreBedDF  = Q3Home(5)
 
-     */
+    var IncomeDF = Q3Income() //Income dataset
 
-    var IncomeDF = Q3Income()
-/*
+    //Joining Rent and Income dataset
     RentPriceStudioDF = RentPriceStudioDF.join(IncomeDF,Seq("State"),"inner")
     RentPrice1BedDF = RentPrice1BedDF.join(IncomeDF, Seq("State"), "inner")
     RentPrice2BedDF = RentPrice2BedDF.join(IncomeDF, Seq("State"), "inner")
@@ -265,23 +273,29 @@ object Question3 extends java.io.Serializable {
     RentPrice4BedDF = RentPrice4BedDF.join(IncomeDF, Seq("State"), "inner")
     RentPrice5OrMoreBedDF = RentPrice5OrMoreBedDF.join(IncomeDF, Seq("State"), "inner")
 
- */
+    //Rent + Income DFs list for iteration
+    val RentDFs = Seq(RentPriceStudioDF,RentPrice1BedDF,
+      RentPrice2BedDF,RentPrice3BedDF,
+      RentPrice4BedDF,RentPrice5OrMoreBedDF)
+
+    //Joining Home and Income dataset
     HomePrice1BedDF = HomePrice1BedDF.join(IncomeDF, Seq("State"), "inner")
-    /*
     HomePrice2BedDF = HomePrice2BedDF.join(IncomeDF, Seq("State"), "inner")
     HomePrice3BedDF = HomePrice3BedDF.join(IncomeDF, Seq("State"), "inner")
     HomePrice4BedDF = HomePrice4BedDF.join(IncomeDF, Seq("State"), "inner")
     HomePrice5OrMoreBedDF = HomePrice5OrMoreBedDF.join(IncomeDF, Seq("State"), "inner")
 
-    val RentDFs = Seq(RentPriceStudioDF,RentPrice1BedDF,
-      RentPrice2BedDF,RentPrice3BedDF,
-      RentPrice4BedDF,RentPrice5OrMoreBedDF)
-     */
-    val HomeDFs = Seq(HomePrice1BedDF)
+    //Home + Income DFs list for iteration
+    val HomeDFs = Seq(HomePrice1BedDF,HomePrice2BedDF,
+    HomePrice3BedDF,HomePrice4BedDF,
+    HomePrice5OrMoreBedDF)
 
+    //For printing messages so reader for which dataset are results for
     var Rent_i = 0
     var Home_i = 0
-/*
+
+    //Main For Loop for each Rent + Income DF to
+    //calculate Price to Income Ratio (PI_ratio)
     for(df_name <- RentDFs){
 
       val name = RentDF_names(Rent_i)
@@ -297,20 +311,39 @@ object Question3 extends java.io.Serializable {
       println(s"Average of Median Rental Price for ${name}")
       df.show()
 
-      for(ratio_year <- yearly_ratio_list){
-        println(s"${ratio_year.slice(0,4)} affordable state for rent among top 10 populous state")
-        df.select("State",ratio_year)
-          .where(df(ratio_year)=!=0)
-          .withColumnRenamed(ratio_year,"PI_ratio")
+      var df_Most_Afforable = spark.createDataFrame(spark.sparkContext.emptyRDD[Row],schema)
+      var df_Least_Afforable = spark.createDataFrame(spark.sparkContext.emptyRDD[Row],schema)
+      for(ratio_year <- yearly_ratio_list) {
+
+        //Most Affordable States Regarding Rent
+        var df_temp = df.select("State", ratio_year)
+          .withColumn("Year", lit(ratio_year.slice(0, 4)))
+          .where(df(ratio_year) =!= 0)
+          .withColumnRenamed(ratio_year, "PI_ratio")
           .orderBy("PI_ratio")
+          .select("Year", "State", "PI_ratio")
           .limit(1)
-          .show()
+
+        //Least Affordable States Regarding Rent
+        var df_temp2 = df.select("State", ratio_year)
+          .withColumn("Year", lit(ratio_year.slice(0, 4)))
+          .where(df(ratio_year) =!= 0)
+          .withColumnRenamed(ratio_year, "PI_ratio")
+          .orderBy(col("PI_ratio").desc)
+          .select("Year", "State", "PI_ratio")
+          .limit(1)
+
+        df_Most_Afforable = df_Most_Afforable.union(df_temp)
+        df_Least_Afforable = df_Least_Afforable.union(df_temp2)
       }
+      println("Most Affordable state for rent among top 10 populous state by year")
+      df_Most_Afforable.show()
+      println("Least Affordable state for rent among top 10 populous state by year")
+      df_Least_Afforable.show()
       Rent_i += 1
     }
 
-
- */
+    //Repeated for Home + Income DFs
     for(df_name <- HomeDFs){
 
       val name = HomeDF_names(Home_i)
@@ -326,11 +359,11 @@ object Question3 extends java.io.Serializable {
       println(s"Average of Median House Price for ${name}")
       df.show()
 
-      var df_temp1 = spark.createDataFrame(spark.sparkContext.emptyRDD[Row],schema)
-      println("Affordable state for house among top 10 populous state by year")
+      var df_Most_Afforable = spark.createDataFrame(spark.sparkContext.emptyRDD[Row],schema)
+      var df_Least_Afforable = spark.createDataFrame(spark.sparkContext.emptyRDD[Row],schema)
       for(ratio_year <- yearly_ratio_list){
 
-        var df_temp2 = df.select("State",ratio_year)
+        var df_temp = df.select("State",ratio_year)
           .withColumn("Year",lit(ratio_year.slice(0,4)))
           .where(df(ratio_year)=!=0)
           .withColumnRenamed(ratio_year,"PI_ratio")
@@ -338,9 +371,21 @@ object Question3 extends java.io.Serializable {
           .select("Year","State","PI_ratio")
           .limit(1)
 
-        df_temp1 = df_temp1.union(df_temp2)
+        var df_temp2 = df.select("State",ratio_year)
+          .withColumn("Year",lit(ratio_year.slice(0,4)))
+          .where(df(ratio_year)=!=0)
+          .withColumnRenamed(ratio_year,"PI_ratio")
+          .orderBy(col("PI_ratio").desc)
+          .select("Year","State","PI_ratio")
+          .limit(1)
+
+        df_Most_Afforable = df_Most_Afforable.union(df_temp)
+        df_Least_Afforable = df_Least_Afforable.union(df_temp2)
       }
-      df_temp1.show()
+      println("Most Affordable state for house among top 10 populous state by year")
+      df_Most_Afforable.show()
+      println("Least Affordable state for house among top 10 populous state by year")
+      df_Least_Afforable.show()
       Home_i += 1
     }
   }
